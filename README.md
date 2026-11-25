@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartCity — Connected Civic Portal & Live Urban Services</title>
+  <meta name="description" content="Official SmartCity digital portal for transportation, healthcare, education, public services, live emergency alerts, city statistics, and interactive GIS maps." />
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            civic: {
+              navy: '#0F172A',
+              blue: '#1E3A8A',
+              teal: '#0D9488',
+              emerald: '#10B981',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Leaflet.js CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .leaflet-container { z-index: 10 !important; border-radius: 0.75rem; }
+    .custom-pin {
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 9999px;
+      color: white; font-size: 14px; border: 2.5px solid #ffffff;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
+    }
+    /* Hide scrollbar for horizontal nav tabs on mobile */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
+
+  <!-- TOP CIVIC STATUS RIBBON -->
+  <div class="bg-slate-900 text-slate-200 text-xs py-1.5 px-4 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-4">
+        <span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> All Core City Grids Operational
+        </span>
+        <span class="hidden sm:inline text-slate-400">|</span>
+        <span class="hidden sm:inline"><i class="fa-solid fa-sun text-amber-400 mr-1"></i>24°C Clear</span>
+        <span class="hidden md:inline"><i class="fa-solid fa-wind text-teal-400 mr-1"></i>AQI: 38 (Good)</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label for="langSelect" class="sr-only">Language</label>
+        <select id="langSelect" onchange="showToast('Portal language switched to ' + this.value, 'info')" class="bg-slate-800 text-slate-200 rounded px-2 py-0.5 text-xs border border-slate-700 focus:outline-none">
+          <option value="English">🌐 English</option>
+          <option value="Español">🌐 Español</option>
+          <option value="हिन्दी">🌐 हिन्दी</option>
+          <option value="Français">🌐 Français</option>
+        </select>
+        <button onclick="openDevSpecsModal()" class="text-teal-400 hover:text-teal-300 underline font-medium">
+          <i class="fa-solid fa-code mr-1"></i>API & QA Specs
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STICKY MAIN NAVIGATION BAR -->
+  <header class="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex items-center justify-between h-16 gap-3">
+        <!-- Brand Logo -->
+        <button onclick="navigateTo('home')" class="flex items-center gap-2.5 text-left group focus:outline-none">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-900 via-blue-700 to-teal-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition">
+            <i class="fa-solid fa-city text-lg"></i>
+          </div>
+          <div>
+            <span class="font-extrabold text-xl tracking-tight text-blue-950 dark:text-white block leading-none">Smart<span class="text-teal-600 dark:text-teal-400">City</span></span>
+            <span class="text-[11px] font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase">Civic Digital Portal</span>
+          </div>
+        </button>
+
+        <!-- Global Search Bar (Desktop & Tablet) -->
+        <div class="hidden md:flex flex-1 max-w-md mx-4 relative">
+          <div class="relative w-full">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input
+              id="globalSearchInput"
+              type="search"
+              oninput="handleGlobalSearch(this.value)"
+              placeholder="Search hospitals, bus routes, permits, schools..."
+              aria-label="Global City Search"
+              class="w-full pl-10 pr-4 py-2 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition"
+            />
+          </div>
+          <!-- Live Search Dropdown -->
+          <div id="globalSearchResults" class="hidden absolute top-12 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-80 overflow-y-auto z-50 p-2"></div>
+        </div>
+
+        <!-- Right Controls: Dark Mode, Prominent Emergency Call Button, Mobile Menu -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button
+            id="darkModeToggle"
+            onclick="toggleDarkMode()"
+            aria-label="Toggle Dark Mode"
+            class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-amber-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+            title="Toggle Dark / Light Theme"
+          >
+            <i id="darkModeIcon" class="fa-solid fa-moon text-base"></i>
+          </button>
+
+          <button
+            onclick="openEmergencyModal()"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-red-600/20 transition animate-pulse hover:animate-none"
+          >
+            <i class="fa-solid fa-phone-volume"></i>
+            <span>Emergency <span class="hidden sm:inline">911</span></span>
+          </button>
+
+          <button
+            onclick="toggleMobileMenu()"
+            aria-label="Open Navigation Menu"
+            class="lg:hidden p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+          >
+            <i class="fa-solid fa-bars text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Search Bar -->
+      <div class="md:hidden pb-3 relative">
+        <div class="relative w-full">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input
+            type="search"
+            oninput="handleGlobalSearch(this.value, true)"
+            placeholder="Search city services, hospitals, transit..."
+            class="w-full pl-10 pr-4 py-2 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 focus:outline-none"
+          />
+        </div>
+        <div id="mobileSearchResults" class="hidden absolute top-11 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-72 overflow-y-auto z-50 p-2"></div>
+      </div>
+
+      <!-- Desktop Horizontal Section Nav -->
+      <nav aria-label="Primary Navigation" class="hidden lg:flex items-center gap-1 py-2 border-t border-slate-100 dark:border-slate-800 overflow-x-auto no-scrollbar">
+        <button data-nav="home" onclick="navigateTo('home')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Home</button>
+        <button data-nav="transportation" onclick="navigateTo('transportation')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Transportation</button>
+        <button data-nav="hospitals" onclick="navigateTo('hospitals')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Hospitals</button>
+        <button data-nav="education" onclick="navigateTo('education')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Education</button>
+        <button data-nav="services" onclick="navigateTo('services')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Public Services</button>
+        <button data-nav="emergency" onclick="navigateTo('emergency')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 transition">Emergency</button>
+        <button data-nav="statistics" onclick="navigateTo('statistics')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">City Statistics</button>
+        <button data-nav="locations" onclick="navigateTo('locations')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Important Locations</button>
+        <button data-nav="contact" onclick="navigateTo('contact')" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold transition">Contact</button>
+      </nav>
+    </div>
+
+    <!-- Mobile Dropdown Navigation -->
+    <div id="mobileNavDrawer" class="hidden lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-3 space-y-1">
+      <button onclick="navigateTo('home'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Home</button>
+      <button onclick="navigateTo('transportation'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Transportation</button>
+      <button onclick="navigateTo('hospitals'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Hospitals & Healthcare</button>
+      <button onclick="navigateTo('education'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Education</button>
+      <button onclick="navigateTo('services'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Public Services</button>
+      <button onclick="navigateTo('emergency'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">Emergency Information</button>
+      <button onclick="navigateTo('statistics'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">City Statistics</button>
+      <button onclick="navigateTo('locations'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Important Locations</button>
+      <button onclick="navigateTo('contact'); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 dark:hover:bg-slate-800">Contact & Helpline</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1">
+
+    <!-- ========================================== -->
+    <!-- 1. HOMEPAGE VIEW                           -->
+    <!-- ========================================== -->
+    <section id="view-home" class="view-section space-y-10 pb-16">
+      <!-- Hero Banner -->
+      <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-teal-900 text-white">
+        <img
+          src="https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?auto=format&fit=crop&w=1800&q=80"
+          onerror="this.src='https://placehold.co/1600x700/0f172a/ffffff?text=SmartCity+Skyline'"
+          alt="SmartCity Modern Urban Skyline"
+          class="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-luminosity"
+        />
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
+          <div class="max-w-3xl space-y-5">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-200 text-xs font-semibold tracking-wide uppercase">
+              <i class="fa-solid fa-satellite-dish"></i> Official SmartCity Civic OS v4.2
+            </span>
+            <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
+              Your City, <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-emerald-300">Connected and Smarter</span>
+            </h1>
+            <p class="text-base sm:text-lg text-slate-200 leading-relaxed">
+              Access real-time transit arrivals, emergency hospital bed availability, utility bill payments, municipal permits, and interactive GIS city maps—all in one unified civic portal.
+            </p>
+            <!-- Hero Quick-Access Buttons -->
+            <div class="pt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              <button onclick="navigateTo('services', 'issueFormSection')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/15 transition text-center">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">Report an Issue</span>
+              </button>
+              <button onclick="navigateTo('hospitals')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/15 transition text-center">
+                <i class="fa-solid fa-hospital text-teal-300 text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">Find a Hospital</span>
+              </button>
+              <button onclick="navigateTo('transportation')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/15 transition text-center">
+                <i class="fa-solid fa-bus text-sky-300 text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">Bus Routes</span>
+              </button>
+              <button onclick="navigateTo('emergency')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-red-600/80 hover:bg-red-600 backdrop-blur border border-red-400/30 transition text-center">
+                <i class="fa-solid fa-kit-medical text-white text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">Emergency Help</span>
+              </button>
+              <button onclick="navigateTo('services')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/15 transition text-center">
+                <i class="fa-solid fa-file-invoice-dollar text-emerald-300 text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">Pay Bills</span>
+              </button>
+              <button onclick="navigateTo('locations')" class="flex flex-col items-center justify-center p-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/15 transition text-center">
+                <i class="fa-solid fa-map-location-dot text-indigo-300 text-xl mb-1.5"></i>
+                <span class="text-xs font-semibold">City Map</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live City Status Widgets -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 -mt-6 relative z-20">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-md border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+              <i class="fa-solid fa-traffic-light text-lg"></i>
+            </div>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Traffic Status</p>
+              <p class="font-bold text-sm mt-0.5">Moderate Flow (82%)</p>
+              <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">Lane closure on Harbour Bridge</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-md border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400">
+              <i class="fa-solid fa-cloud-sun text-lg"></i>
+            </div>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Weather</p>
+              <p class="font-bold text-sm mt-0.5">24°C • Clear Sky</p>
+              <p class="text-xs text-slate-500 mt-1">Humidity 48% • Wind 12 km/h</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-md border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+              <i class="fa-solid fa-leaf text-lg"></i>
+            </div>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Air Quality Index</p>
+              <p class="font-bold text-sm mt-0.5 text-emerald-600 dark:text-emerald-400">AQI 38 — Good</p>
+              <p class="text-xs text-slate-500 mt-1">PM2.5: 9.4 µg/m³ across 14 sensors</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-md border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400">
+              <i class="fa-solid fa-bolt text-lg"></i>
+            </div>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Power & Water</p>
+              <p class="font-bold text-sm mt-0.5">99.8% Uptime</p>
+              <p class="text-xs text-slate-500 mt-1">Ward 14 valve check 2PM–4PM</p>
+            </div>
+          </div>
+
+          <div class="bg-red-50 dark:bg-red-950/40 rounded-2xl p-4 shadow-md border border-red-200 dark:border-red-900 flex items-start gap-3">
+            <div class="p-2.5 rounded-xl bg-red-600 text-white">
+              <i class="fa-solid fa-bullhorn text-lg"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-400">Live Notice</p>
+              <p class="font-bold text-sm mt-0.5 text-red-900 dark:text-red-200">Coastal Breeze Advisory</p>
+              <button onclick="navigateTo('emergency')" class="text-xs font-semibold text-red-700 dark:text-red-300 underline mt-1">View Alert Details →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Featured Services Grid -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Essential Civic Services</h2>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Fast digital access to municipal infrastructure, health, education, and open data.</p>
+          </div>
+          <button onclick="navigateTo('services')" class="text-sm font-semibold text-teal-600 dark:text-teal-400 hover:underline">Explore All Services →</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-train-subway"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Smart Mobility & Transit</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Live GPS bus/metro arrivals, multimodal route planner, EV charger map, and smart parking availability.</p>
+            <button onclick="navigateTo('transportation')" class="text-sm font-semibold text-blue-700 dark:text-blue-400 hover:underline">Open Transit Hub →</button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Healthcare & Emergency Beds</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Real-time ICU & general bed counts, blood bank stock, OPD scheduling, and nearest trauma center locator.</p>
+            <button onclick="navigateTo('hospitals')" class="text-sm font-semibold text-teal-700 dark:text-teal-400 hover:underline">Find Medical Care →</button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Education & Public Libraries</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Explore accredited schools, universities, STEM skill centers, scholarships, and safe school transit corridors.</p>
+            <button onclick="navigateTo('education')" class="text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">Browse Institutions →</button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-file-signature"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">e-Governance & Utility Bills</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Pay property tax, water/electricity bills, download birth/trade certificates, and track 311 civic tickets.</p>
+            <button onclick="navigateTo('services')" class="text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:underline">Access Citizen Desk →</button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-chart-pie"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Open City Data & Analytics</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Interactive ward-level demographics, air quality telemetry, public transit KPIs, and downloadable CSV/PDF reports.</p>
+            <button onclick="navigateTo('statistics')" class="text-sm font-semibold text-cyan-700 dark:text-cyan-400 hover:underline">View Open Data →</button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+            <div class="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 flex items-center justify-center text-xl mb-4">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3 class="font-bold text-lg mb-2">24/7 Public Safety & Shelters</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">One-tap emergency dispatch, disaster evacuation corridors, first-aid guides, and geo-tagged incident reporting.</p>
+            <button onclick="navigateTo('emergency')" class="text-sm font-semibold text-rose-700 dark:text-rose-400 hover:underline">Open Safety Center →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Map Preview + Latest Civic News -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Map Preview -->
+        <div class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-xl font-bold">Live Civic Infrastructure Map</h2>
+              <p class="text-xs text-slate-500">Hospitals, Schools, Transport Hubs, Police Stations & Gov Offices</p>
+            </div>
+            <button onclick="navigateTo('locations')" class="px-3 py-1.5 rounded-lg bg-blue-900 text-white text-xs font-semibold hover:bg-blue-800 transition">
+              Full Screen Map & Filters
+            </button>
+          </div>
+          <div id="homeMap" class="w-full h-80 sm:h-96 rounded-xl border border-slate-200 dark:border-slate-700"></div>
+          <div class="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600"></span> Hospitals</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-600"></span> Schools</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-600"></span> Transport</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-indigo-600"></span> Police/Gov</span>
+          </div>
+        </div>
+
+        <!-- Latest News, Events & Public Notices -->
+        <div class="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-bold">City News & Public Notices</h2>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300">Updated Live</span>
+            </div>
+
+            <div class="space-y-3">
+              <article class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <div class="flex items-center justify-between text-xs text-teal-600 dark:text-teal-400 font-semibold mb-1">
+                  <span>INFRASTRUCTURE</span>
+                  <span>2 hours ago</span>
+                </div>
+                <h3 class="font-bold text-sm">Metro Blue Line Extended to Tech Park North</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">Four new zero-emission stations open this week with 4-minute peak frequency.</p>
+              </article>
+
+              <article class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <div class="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-1">
+                  <span>PUBLIC HEALTH</span>
+                  <span>Yesterday</span>
+                </div>
+                <h3 class="font-bold text-sm">Free Seasonal Immunization Drive Across 12 Clinics</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">Walk-in clinics open daily 8:00 AM – 6:00 PM for seniors, children, and frontline workers.</p>
+              </article>
+
+              <article class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <div class="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">
+                  <span>CIVIC GOVERNANCE</span>
+                  <span>Nov 22, 2026</span>
+                </div>
+                <h3 class="font-bold text-sm">2027 Participatory Smart Ward Budget Townhall</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">Residents can vote online or attend City Hall Auditorium on Saturday at 10:00 AM.</p>
+              </article>
+            </div>
+          </div>
+
+          <button onclick="navigateTo('services')" class="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-semibold transition">
+            View All Tenders & Council Meetings
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 2. TRANSPORTATION VIEW                     -->
+    <!-- ========================================== -->
+    <section id="view-transportation" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Smart Mobility Network</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Transportation & Live Transit</h1>
+          <p class="text-sm text-slate-600 dark:text-slate-400">Real-time bus, metro, tram & rail tracking, multimodal trip planner, EV chargers, and traffic alerts.</p>
+        </div>
+        <button onclick="downloadTransitMap()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold shadow-sm transition">
+          <i class="fa-solid fa-file-arrow-down"></i> Download Transit Map & Fares (CSV)
+        </button>
+      </div>
+
+      <!-- Interactive Multimodal Route Planner -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 class="font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-route text-teal-600"></i> Multimodal Route Planner</h2>
+        <form onsubmit="planTransitRoute(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-500">Origin Stop / Landmark</label>
+            <select id="routeOrigin" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+              <option>Central Union Station</option>
+              <option>Tech Park North Hub</option>
+              <option>Harbourfront Ferry & Tram</option>
+              <option>City General Hospital Stop</option>
+              <option>Metro University Campus</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-500">Destination</label>
+            <select id="routeDest" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+              <option>International Airport Terminal 2</option>
+              <option>Civic Center & City Hall</option>
+              <option>Riverside Botanical Park</option>
+              <option>Central Union Station</option>
+              <option>Eastside Innovation District</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-500">Departure Time</label>
+            <input id="routeTime" type="time" value="08:30" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-500">Preferred Mode</label>
+            <select id="routeMode" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+              <option value="Fastest (Metro + Express Bus)">Fastest (Metro + Bus)</option>
+              <option value="Electric Bus Only">Electric Bus Only</option>
+              <option value="Metro & Commuter Rail">Metro & Rail</option>
+              <option value="Bike Share + Tram">Bike Share + Tram</option>
+              <option value="Wheelchair Accessible Step-Free">♿ Step-Free Accessible</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm transition">
+              Find Best Route
+            </button>
+          </div>
+        </form>
+        <div id="routePlannerOutput" class="hidden p-4 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-sm"></div>
+      </div>
+
+      <!-- Live Stops & Real-Time Arrivals (10 Stops) -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-bold text-lg">Live Transit Stops & Real-Time Arrivals (10 Active Hubs)</h2>
+          <div class="flex gap-2">
+            <button onclick="filterTransit('All')" class="transit-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-blue-900 text-white">All</button>
+            <button onclick="filterTransit('Metro')" class="transit-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800">Metro</button>
+            <button onclick="filterTransit('Bus')" class="transit-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800">Bus</button>
+            <button onclick="filterTransit('Rail')" class="transit-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800">Rail</button>
+            <button onclick="filterTransit('Tram')" class="transit-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800">Tram</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 dark:border-slate-800 text-xs uppercase text-slate-500">
+                <th class="py-3 px-3">Stop ID & Name</th>
+                <th class="py-3 px-3">Mode & Line</th>
+                <th class="py-3 px-3">Destination</th>
+                <th class="py-3 px-3">Next Arrival</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Accessibility</th>
+              </tr>
+            </thead>
+            <tbody id="transitTableBody" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Smart Parking, EV Chargers, Bike Share & Roadwork Alerts -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <h3 class="font-bold text-base flex items-center gap-2"><i class="fa-solid fa-charging-station text-emerald-500"></i> Smart Parking & EV Charging</h3>
+          <div class="space-y-2.5 text-sm">
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 flex justify-between items-center">
+              <div><p class="font-semibold">Central Plaza Garage</p><p class="text-xs text-slate-500">12 Fast EV Chargers Free</p></div>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs">142 Spots</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 flex justify-between items-center">
+              <div><p class="font-semibold">Tech Park Deck B</p><p class="text-xs text-slate-500">8 Level-3 Chargers Free</p></div>
+              <span class="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold text-xs">29 Spots</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 flex justify-between items-center">
+              <div><p class="font-semibold">Harbourfront Lot</p><p class="text-xs text-slate-500">6 EV Chargers Free</p></div>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs">88 Spots</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <h3 class="font-bold text-base flex items-center gap-2"><i class="fa-solid fa-bicycle text-teal-500"></i> Bike-Sharing & Greenways</h3>
+          <div class="space-y-2.5 text-sm">
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 flex justify-between items-center">
+              <div><p class="font-semibold">Union Station Dock #01</p><p class="text-xs text-slate-500">8 e-Bikes • 6 Classic</p></div>
+              <span class="text-xs font-bold text-teal-600">14 Bikes</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 flex justify-between items-center">
+              <div><p class="font-semibold">University Quad Dock #09</p><p class="text-xs text-slate-500">11 e-Bikes • 4 Classic</p></div>
+              <span class="text-xs font-bold text-teal-600">15 Bikes</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70">
+              <p class="font-semibold text-xs text-emerald-600">SAFE PEDESTRIAN CORRIDOR</p>
+              <p class="text-xs text-slate-500 mt-0.5">18 km Riverside Car-Free Greenway open with solar lighting.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <h3 class="font-bold text-base flex items-center gap-2"><i class="fa-solid fa-road-barrier text-amber-500"></i> Traffic & Fare Info</h3>
+          <div class="space-y-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
+              <p class="font-bold text-amber-800 dark:text-amber-300">Harbour Bridge Northbound</p>
+              <p class="text-amber-700 dark:text-amber-400 mt-0.5">Right lane closed for smart sensor resurfacing until 18:00.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 space-y-1">
+              <p class="font-bold text-sm">Unified SmartCard Fares</p>
+              <p class="text-slate-600 dark:text-slate-400">• Single Metro/Bus Ride: <strong>$1.75</strong></p>
+              <p class="text-slate-600 dark:text-slate-400">• 24-Hour Unlimited City Pass: <strong>$5.00</strong></p>
+              <p class="text-slate-600 dark:text-slate-400">• Accessible Paratransit & Seniors: <strong>Free</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 3. HOSPITALS & HEALTHCARE VIEW             -->
+    <!-- ========================================== -->
+    <section id="view-hospitals" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Public Health Network</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Hospitals & Healthcare Directory</h1>
+          <p class="text-sm text-slate-600 dark:text-slate-400">Live emergency bed availability, trauma centers, blood banks, pharmacies, and OPD appointment booking.</p>
+        </div>
+        <button onclick="findNearestHospital()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold shadow-md transition">
+          <i class="fa-solid fa-location-crosshairs"></i> Locate Nearest Emergency Hospital
+        </button>
+      </div>
+
+      <!-- Nearest Hospital Banner (Populated via Geolocation) -->
+      <div id="nearestHospitalBanner" class="hidden p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex flex-wrap items-center justify-between gap-4"></div>
+
+      <!-- Health Advisory Strip -->
+      <div class="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-syringe text-teal-600 dark:text-teal-400 text-xl"></i>
+          <div>
+            <span class="font-bold">2026 Autumn Vaccination & Flu Prevention Notice:</span>
+            <span class="text-slate-700 dark:text-slate-300"> Free boosters available at all 6 municipal hospitals and Central Blood & Diagnostic Center.</span>
+          </div>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-600 text-white">No Appointment Needed</span>
+      </div>
+
+      <!-- Filters -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <input id="hospSearch" oninput="renderHospitals()" type="search" placeholder="Search hospital, clinic, blood bank..." class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+        <select id="hospSpecialtyFilter" onchange="renderHospitals()" class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All Specialties & Types</option>
+          <option value="Multi-Specialty & Trauma">Multi-Specialty & Trauma</option>
+          <option value="Cardiology & Neurology">Cardiology & Neurology</option>
+          <option value="Pediatrics & Maternity">Pediatrics & Maternity</option>
+          <option value="Blood Bank & Diagnostics">Blood Bank & Diagnostics</option>
+          <option value="24/7 Pharmacy & Urgent Care">24/7 Pharmacy & Urgent Care</option>
+        </select>
+        <select id="hospWardFilter" onchange="renderHospitals()" class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All City Zones</option>
+          <option value="Central District">Central District</option>
+          <option value="North Tech Corridor">North Tech Corridor</option>
+          <option value="Harbourfront">Harbourfront</option>
+          <option value="Westside">Westside</option>
+        </select>
+        <label class="inline-flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm cursor-pointer">
+          <input id="hospEmergencyOnly" onchange="renderHospitals()" type="checkbox" class="rounded text-teal-600 focus:ring-teal-500" />
+          <span class="font-medium">24/7 Emergency Open Only</span>
+        </label>
+      </div>
+
+      <!-- Hospitals Grid (6+ Facilities) -->
+      <div id="hospitalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+      <!-- OPD Appointment Request Form -->
+      <div id="appointmentFormCard" class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-calendar-check text-teal-600"></i> Book Hospital OPD / Diagnostic Appointment</h2>
+        <form onsubmit="submitHospitalAppointment(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Patient Full Name *</label>
+            <input required id="apptName" type="text" placeholder="e.g., Maya Lin" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Select Healthcare Facility *</label>
+            <select id="apptHospital" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+              <option>Metro City General Hospital</option>
+              <option>St. Jude Heart & Neuro Institute</option>
+              <option>Harbourfront Children & Women's Hospital</option>
+              <option>Northside Trauma & Orthopedic Center</option>
+              <option>Central Blood Bank & Rapid Diagnostics</option>
+              <option>Westside 24/7 Urgent Care & Pharmacy</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Preferred Date *</label>
+            <input required id="apptDate" type="date" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm transition">
+              Confirm Appointment
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 4. EDUCATION VIEW                          -->
+    <!-- ========================================== -->
+    <section id="view-education" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Knowledge & Learning</span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Education, Libraries & Skill Centers</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Accredited schools, universities, digital public libraries, scholarship deadlines, and safe student transit.</p>
+      </div>
+
+      <!-- Scholarship & Admission Banner -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-2xl bg-blue-900 text-white space-y-1">
+          <span class="text-[11px] uppercase font-bold text-teal-300">Admissions Open</span>
+          <h3 class="font-bold text-sm">2027 K-12 Unified School Enrollment</h3>
+          <p class="text-xs text-blue-100">Apply online before Dec 15, 2026. Zero application fee for SmartCity residents.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-teal-700 text-white space-y-1">
+          <span class="text-[11px] uppercase font-bold text-emerald-200">Scholarships</span>
+          <h3 class="font-bold text-sm">Mayor's STEM & Green Tech Fellowship</h3>
+          <p class="text-xs text-teal-50">Up to 100% tuition grant for undergraduate engineering & environmental science students.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-800 text-white space-y-1">
+          <span class="text-[11px] uppercase font-bold text-amber-300">Digital Library</span>
+          <h3 class="font-bold text-sm">180,000+ Free e-Books & Coding Labs</h3>
+          <p class="text-xs text-slate-300">Open daily 7:00 AM – 10:00 PM with free gigabit Wi-Fi across all 6 branch libraries.</p>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <input id="eduSearch" oninput="renderEducation()" type="search" placeholder="Search school, university, library..." class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+        <select id="eduLevelFilter" onchange="renderEducation()" class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All Institution Levels</option>
+          <option value="K-12 School">K-12 School</option>
+          <option value="University">University</option>
+          <option value="Technical College">Technical College</option>
+          <option value="Public Library">Public Library</option>
+        </select>
+        <select id="eduBoardFilter" onchange="renderEducation()" class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All Boards / Accreditations</option>
+          <option value="IB & National">IB & National</option>
+          <option value="STEM State Board">STEM State Board</option>
+          <option value="UGC / Accredited">UGC / Accredited</option>
+          <option value="Municipal Open Access">Municipal Open Access</option>
+        </select>
+        <select id="eduFeeFilter" onchange="renderEducation()" class="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All Fee Tiers</option>
+          <option value="Free / Public">Free / Public</option>
+          <option value="Subsidized">Subsidized</option>
+          <option value="Private / Aid Available">Private / Aid Available</option>
+        </select>
+      </div>
+
+      <!-- Education Grid (8 Institutions) -->
+      <div id="educationGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 5. PUBLIC SERVICES VIEW                    -->
+    <!-- ========================================== -->
+    <section id="view-services" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Digital Citizen Desk</span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Public Services & e-Governance</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Pay utility bills, apply for permits/certificates, report civic issues, and track request IDs.</p>
+      </div>
+
+      <!-- Online Citizen Service Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <button onclick="openServiceActionModal('Electricity & Water Bill Payment', 'Account / Meter Number')" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-file-invoice-dollar text-teal-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">Pay Utility Bills</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Instant e-Receipt</p>
+        </button>
+        <button onclick="openServiceActionModal('Annual Property Tax Portal', 'Property Parcel ID (e.g., SC-PROP-402)')" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-house-chimney-crack text-blue-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">Property Tax</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Assess & Pay Online</p>
+        </button>
+        <button onclick="openServiceActionModal('Land & Property Records Lookup', 'Survey / Deed Number')" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-folder-open text-indigo-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">Property Records</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Verified GIS Registry</p>
+        </button>
+        <button onclick="openServiceActionModal('Building & Trade Permit Application', 'Business / Plot Registration ID')" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-helmet-safety text-amber-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">Building Permits</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Fast-Track Approval</p>
+        </button>
+        <button onclick="openServiceActionModal('Birth, Marriage & Residency Certificates', 'Citizen National / Civic ID')" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-certificate text-emerald-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">Certificates</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Digitally Signed PDF</p>
+        </button>
+        <button onclick="document.getElementById('issueFormSection').scrollIntoView({behavior:'smooth'})" class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-teal-500 text-left shadow-sm transition">
+          <i class="fa-solid fa-bullhorn text-rose-600 text-2xl mb-2"></i>
+          <h3 class="font-bold text-sm">311 Civic Issue</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Potholes & Streetlights</p>
+        </button>
+      </div>
+
+      <!-- Issue Reporting + Complaint ID Tracker -->
+      <div id="issueFormSection" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Report an Issue Form -->
+        <div class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-amber-500"></i> Report a Municipal Issue (311)</h2>
+          <form onsubmit="submitCivicIssue(event)" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold mb-1">Issue Category *</label>
+                <select id="issueCategory" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                  <option>Pothole / Road Damage</option>
+                  <option>Streetlight Fault</option>
+                  <option>Missed Garbage Collection</option>
+                  <option>Water Pipe Leakage</option>
+                  <option>Noise Violation</option>
+                  <option>Illegal Parking</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold mb-1">Ward / Street Location *</label>
+                <input required id="issueLocation" type="text" placeholder="e.g., 4th Ave & Oak St, Ward 12" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1">Description *</label>
+              <textarea required id="issueDesc" rows="3" placeholder="Provide landmarks or severity details..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"></textarea>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer bg-slate-100 dark:bg-slate-800 px-3.5 py-2 rounded-xl">
+                <i class="fa-solid fa-camera text-teal-600"></i>
+                <span id="issuePhotoLabel">Attach Photo Evidence (Optional)</span>
+                <input type="file" accept="image/*" class="hidden" onchange="document.getElementById('issuePhotoLabel').textContent = this.files[0] ? this.files[0].name : 'Attach Photo Evidence'" />
+              </label>
+              <button type="submit" class="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm transition">
+                Submit Civic Ticket
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Track Complaint ID & Utility Schedules -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-magnifying-glass-location text-blue-600"></i> Track Service Request</h2>
+            <p class="text-xs text-slate-500">Try sample IDs: <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">SC-2026-884</code> or <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">SC-2026-912</code></p>
+            <div class="flex gap-2">
+              <input id="trackTicketInput" type="text" value="SC-2026-884" placeholder="Enter Complaint ID" class="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-mono uppercase" />
+              <button onclick="trackCivicTicket()" class="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold">Track</button>
+            </div>
+            <div id="ticketStatusResult" class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 text-xs space-y-1 border border-slate-200 dark:border-slate-700">
+              <div class="flex justify-between font-bold">
+                <span>ID: SC-2026-884 (Streetlight Repair)</span>
+                <span class="text-emerald-600">IN PROGRESS</span>
+              </div>
+              <p class="text-slate-500">Assigned to Electrical Grid Crew #4 • ETA: Today, 5:30 PM</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 text-xs">
+            <h3 class="font-bold text-sm">Smart Waste & Utility Schedule</h3>
+            <p class="text-slate-600 dark:text-slate-400">♻️ <strong>Recycling & Organic Pickup:</strong> Mon, Wed, Fri (6:30 AM – 9:30 AM)</p>
+            <p class="text-slate-600 dark:text-slate-400">💧 <strong>Water Supply Pressure:</strong> Normal across all 42 wards (Smart sensors active)</p>
+            <p class="text-slate-600 dark:text-slate-400">⚡ <strong>Planned Grid Maintenance:</strong> Sector 9 Substation — Sunday 02:00 AM–04:00 AM</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8 Municipal Departments Directory -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <h2 class="text-xl font-bold">Municipal Departments Directory (8 Offices)</h2>
+        <div id="departmentsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 6. EMERGENCY INFORMATION VIEW              -->
+    <!-- ========================================== -->
+    <section id="view-emergency" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div class="p-6 rounded-2xl bg-gradient-to-r from-red-700 to-rose-800 text-white shadow-lg flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-bold uppercase">24/7 Rapid Command Center</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Emergency Response & Public Safety</h1>
+          <p class="text-sm text-red-100 mt-1">Tap any emergency helpline below for immediate dispatch or locate nearest safe shelters.</p>
+        </div>
+        <button onclick="findNearestHospital()" class="px-4 py-2.5 rounded-xl bg-white text-red-700 font-bold text-sm hover:bg-red-50 transition shadow">
+          <i class="fa-solid fa-truck-medical mr-1.5"></i> Nearest Trauma Center
+        </button>
+      </div>
+
+      <!-- One-Tap Emergency Helplines -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <a href="tel:911" onclick="showToast('Dialing Police Emergency Dispatch (911)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-blue-900 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-shield-halved"></i></div>
+          <p class="font-bold text-sm">Police</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">911 / 100</p>
+        </a>
+        <a href="tel:101" onclick="showToast('Dialing Fire & Rescue Brigade (101)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-red-600 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-fire-extinguisher"></i></div>
+          <p class="font-bold text-sm">Fire Brigade</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">101</p>
+        </a>
+        <a href="tel:102" onclick="showToast('Dialing Medical Ambulance (102)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-truck-medical"></i></div>
+          <p class="font-bold text-sm">Ambulance</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">102</p>
+        </a>
+        <a href="tel:108" onclick="showToast('Dialing Disaster Management Helpline (108)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-amber-600 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-house-flood-water"></i></div>
+          <p class="font-bold text-sm">Disaster Helpline</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">108</p>
+        </a>
+        <a href="tel:1091" onclick="showToast('Dialing Women Safety Helpline (1091)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-purple-700 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-person-dress"></i></div>
+          <p class="font-bold text-sm">Women's Safety</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">1091</p>
+        </a>
+        <a href="tel:1098" onclick="showToast('Dialing Child Helpline (1098)...', 'error')" class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-red-500/40 hover:border-red-600 text-center shadow-sm transition group">
+          <div class="w-12 h-12 mx-auto rounded-full bg-teal-600 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-child-reaching"></i></div>
+          <p class="font-bold text-sm">Child Helpline</p>
+          <p class="text-xl font-extrabold text-red-600 mt-0.5">1098</p>
+        </a>
+      </div>
+
+      <!-- Active Emergency Alerts + First Aid Checklist + Emergency Report Form -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-6 space-y-6">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 space-y-3">
+            <h2 class="text-lg font-bold text-red-600 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Active Live Alerts & Safe Zones</h2>
+            <div class="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs space-y-1">
+              <p class="font-bold text-amber-800 dark:text-amber-300">ADVISORY: High Tide & Coastal Gusts (Harbour Zone)</p>
+              <p class="text-slate-700 dark:text-slate-300">Avoid Marina Pier walkways between 19:00 and 23:00. Evacuation Route B2 open.</p>
+            </div>
+            <div class="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
+              <p class="font-bold text-emerald-800 dark:text-emerald-300">DESIGNATED SAFE SHELTERS (OPEN 24/7)</p>
+              <p class="text-slate-700 dark:text-slate-300">1. Civic Convention Center (Capacity: 2,500) • 2. Northside High School Gymnasium (Capacity: 1,200)</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 space-y-3">
+            <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-kit-medical text-teal-600"></i> Emergency Preparedness & First-Aid Checklist</h2>
+            <ul class="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+              <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i> <span><strong>72-Hour Go-Bag:</strong> 3L water/person, non-perishable food, flashlight, power bank, first-aid kit, and prescriptions.</span></li>
+              <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i> <span><strong>Severe Storm / Flood:</strong> Move to higher ground immediately; never walk or drive through moving floodwater.</span></li>
+              <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i> <span><strong>Medical Emergency:</strong> Check responsiveness, call 102, apply direct pressure to bleeding, and keep airways clear.</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Emergency Incident Report Form -->
+        <div class="lg:col-span-6 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 space-y-4">
+          <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-tower-broadcast text-red-600"></i> Rapid Emergency Incident Report</h2>
+          <form onsubmit="submitEmergencyReport(event)" class="space-y-3.5">
+            <div>
+              <label class="block text-xs font-semibold mb-1">Incident Type *</label>
+              <select class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                <option>Road Accident / Collision</option>
+                <option>Fire / Smoke Hazard</option>
+                <option>Flash Flood / Downed Power Line</option>
+                <option>Medical Emergency</option>
+                <option>Public Safety Threat</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1">Exact Location / GPS Coordinates *</label>
+              <div class="flex gap-2">
+                <input required id="emergLocInput" type="text" placeholder="Intersection, landmark, or GPS..." class="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+                <button type="button" onclick="fillCurrentGPS()" class="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-semibold hover:bg-slate-300">Use GPS</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold mb-1">Situation Details *</label>
+              <textarea required rows="3" placeholder="Number of people affected, hazards present..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"></textarea>
+            </div>
+            <button type="submit" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition shadow">
+              Transmit Priority Alert to Command Center
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 7. CITY STATISTICS DASHBOARD               -->
+    <!-- ========================================== -->
+    <section id="view-statistics" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Open Civic Telemetry</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">City Statistics & Performance Dashboard</h1>
+          <p class="text-sm text-slate-600 dark:text-slate-400">Real-time urban indicators across mobility, healthcare, education, and environmental sustainability.</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="exportStatsCSV()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition">
+            <i class="fa-solid fa-file-csv"></i> Export CSV
+          </button>
+          <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold transition">
+            <i class="fa-solid fa-file-pdf"></i> Print / PDF Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Demographic KPI Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-xs text-slate-500 font-semibold">Total Population</p>
+          <p class="text-2xl font-extrabold text-blue-900 dark:text-white mt-1">1,420,500</p>
+          <span class="text-xs text-emerald-600 font-semibold">+1.8% YoY</span>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-xs text-slate-500 font-semibold">Municipal Area</p>
+          <p class="text-2xl font-extrabold text-blue-900 dark:text-white mt-1">485 km²</p>
+          <span class="text-xs text-slate-500">42 Administrative Wards</span>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-xs text-slate-500 font-semibold">Registered Households</p>
+          <p class="text-2xl font-extrabold text-blue-900 dark:text-white mt-1">365,400</p>
+          <span class="text-xs text-teal-600 font-semibold">99.4% Smart Metered</span>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-xs text-slate-500 font-semibold">Literacy Rate</p>
+          <p class="text-2xl font-extrabold text-emerald-600 mt-1">94.8%</p>
+          <span class="text-xs text-emerald-600 font-semibold">+0.6% vs 2025</span>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-xs text-slate-500 font-semibold">311 Ticket Resolution</p>
+          <p class="text-2xl font-extrabold text-teal-600 mt-1">96.2%</p>
+          <span class="text-xs text-slate-500">Avg SLA: 14.2 hrs</span>
+        </div>
+      </div>
+
+      <!-- Chart Filters -->
+      <div class="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <span class="text-xs font-bold uppercase text-slate-500">Filter Telemetry:</span>
+        <select id="statsYearFilter" onchange="updateChartsData()" class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="2026">Year: 2026 (Current)</option>
+          <option value="2025">Year: 2025</option>
+          <option value="2024">Year: 2024</option>
+        </select>
+        <select id="statsWardFilter" onchange="updateChartsData()" class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="All">All 42 Wards (Citywide)</option>
+          <option value="Central">Central District (Wards 1–10)</option>
+          <option value="North">North Tech Corridor (Wards 11–24)</option>
+          <option value="Harbour">Harbourfront & South (Wards 25–42)</option>
+        </select>
+      </div>
+
+      <!-- Interactive Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 class="font-bold text-base mb-1">Public Transit Ridership (Monthly)</h3>
+          <p class="text-xs text-slate-500 mb-4">Metro, Electric Bus, Rail & Bike Share (in Thousands)</p>
+          <div class="h-64"><canvas id="transitChart"></canvas></div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 class="font-bold text-base mb-1">Air Quality (AQI) & Clean Energy</h3>
+          <p class="text-xs text-slate-500 mb-4">Monthly Average AQI (Lower is Cleaner)</p>
+          <div class="h-64"><canvas id="aqiChart"></canvas></div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 class="font-bold text-base mb-1">Municipal Budget & Sector Allocation</h3>
+          <p class="text-xs text-slate-500 mb-4">Healthcare, Education, Transit & Green Infra (%)</p>
+          <div class="h-64"><canvas id="sectorChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 8. IMPORTANT LOCATIONS VIEW                -->
+    <!-- ========================================== -->
+    <section id="view-locations" class="view-section hidden max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Interactive GIS Explorer</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Important City Locations & Landmarks</h1>
+          <p class="text-sm text-slate-600 dark:text-slate-400">Filter 12+ verified civic landmarks, sort by distance using geolocation, bookmark favorites, and preview directions.</p>
+        </div>
+        <button onclick="sortLocationsNearMe()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold shadow transition">
+          <i class="fa-solid fa-location-arrow"></i> Sort "Near Me" (GPS)
+        </button>
+      </div>
+
+      <!-- Category Filter Pills & Search -->
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+        <div class="flex flex-wrap gap-2">
+          <button onclick="setLocationCategory('All')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-900 text-white">All Categories</button>
+          <button onclick="setLocationCategory('Hospital')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🏥 Hospitals</button>
+          <button onclick="setLocationCategory('School')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🎓 Schools & Libraries</button>
+          <button onclick="setLocationCategory('Police & Fire')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🚓 Police & Fire</button>
+          <button onclick="setLocationCategory('Government')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🏛️ Gov Offices</button>
+          <button onclick="setLocationCategory('Transport')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🚉 Transport Hubs</button>
+          <button onclick="setLocationCategory('Park & Culture')" class="loc-cat-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800">🌳 Parks & Attractions</button>
+        </div>
+        <input id="locationSearchInput" oninput="renderImportantLocations()" type="search" placeholder="Search landmark name, address, or accessibility features..." class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+      </div>
+
+      <!-- Map + Cards Split Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-7 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div id="locationsFullMap" class="w-full h-[460px] rounded-xl"></div>
+        </div>
+        <div id="locationsCardsList" class="lg:col-span-5 space-y-3 max-h-[500px] overflow-y-auto pr-1"></div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- 9. CONTACT & HELPLINE VIEW                 -->
+    <!-- ========================================== -->
+    <section id="view-contact" class="view-section hidden max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Citizen Engagement</span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold mt-1">Contact SmartCity & Civic Helpline</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Reach municipal support 24/7 via our 311 helpline, City Hall desk, or digital feedback form.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <i class="fa-solid fa-headset text-teal-600 text-2xl mb-2"></i>
+          <h3 class="font-bold">24/7 Civic Helpline</h3>
+          <p class="text-lg font-extrabold text-blue-900 dark:text-teal-400 mt-1">311 or 1-800-555-CITY</p>
+          <p class="text-xs text-slate-500 mt-1">Multilingual support in 12 languages</p>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <i class="fa-solid fa-building-columns text-blue-600 text-2xl mb-2"></i>
+          <h3 class="font-bold">City Hall Civic Center</h3>
+          <p class="text-sm font-semibold mt-1">100 Civic Plaza, Central District</p>
+          <p class="text-xs text-slate-500 mt-1">Mon–Sat: 8:00 AM – 6:00 PM</p>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <i class="fa-solid fa-envelope-open-text text-emerald-600 text-2xl mb-2"></i>
+          <h3 class="font-bold">Digital Helpdesk</h3>
+          <p class="text-sm font-semibold mt-1">support@smartcity.gov</p>
+          <p class="text-xs text-slate-500 mt-1">Average email response under 4 hours</p>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <h2 class="text-xl font-bold mb-4">Send Citizen Feedback or Inquiry</h2>
+        <form onsubmit="submitContactForm(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Full Name *</label>
+            <input required type="text" placeholder="Your Name" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Email Address *</label>
+            <input required type="email" placeholder="citizen@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1">Subject / Department</label>
+            <select class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+              <option>General Inquiry / Portal Feedback</option>
+              <option>Transportation & Mobility</option>
+              <option>Healthcare & Public Health</option>
+              <option>Education & Libraries</option>
+              <option>Accessibility Accommodation Request</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1">Message *</label>
+            <textarea required rows="4" placeholder="How can SmartCity serve you better?" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"></textarea>
+          </div>
+          <div class="sm:col-span-2">
+            <button type="submit" class="px-6 py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-semibold text-sm transition">
+              Submit Message
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- FOOTER                                     -->
+  <!-- ========================================== -->
+  <footer class="bg-slate-900 text-slate-300 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div class="space-y-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center text-white">
+            <i class="fa-solid fa-city"></i>
+          </div>
+          <span class="font-extrabold text-xl text-white">Smart<span class="text-teal-400">City</span></span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Building an inclusive, sustainable, and transparent digital city through real-time open data, accessible transit, and responsive public services.
+        </p>
+        <div class="flex gap-3 pt-1">
+          <a href="#social" onclick="event.preventDefault(); showToast('Opening SmartCity Official X/Twitter feed', 'info')" aria-label="Twitter" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-teal-600 flex items-center justify-center text-white transition"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="#social" onclick="event.preventDefault(); showToast('Opening SmartCity Official Facebook page', 'info')" aria-label="Facebook" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-teal-600 flex items-center justify-center text-white transition"><i class="fa-brands fa-facebook-f"></i></a>
+          <a href="#social" onclick="event.preventDefault(); showToast('Opening SmartCity YouTube Civic Channel', 'info')" aria-label="YouTube" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-teal-600 flex items-center justify-center text-white transition"><i class="fa-brands fa-youtube"></i></a>
+          <a href="#social" onclick="event.preventDefault(); showToast('Opening SmartCity Open Data GitHub', 'info')" aria-label="GitHub" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-teal-600 flex items-center justify-center text-white transition"><i class="fa-brands fa-github"></i></a>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-white font-bold text-sm uppercase tracking-wider mb-3">Quick Navigation</h3>
+        <ul class="space-y-2 text-xs">
+          <li><button onclick="navigateTo('transportation')" class="hover:text-teal-400">Live Transit & Route Planner</button></li>
+          <li><button onclick="navigateTo('hospitals')" class="hover:text-teal-400">Hospitals & Emergency Beds</button></li>
+          <li><button onclick="navigateTo('education')" class="hover:text-teal-400">Schools, Universities & Libraries</button></li>
+          <li><button onclick="navigateTo('services')" class="hover:text-teal-400">Pay Utility Bills & Permits</button></li>
+          <li><button onclick="navigateTo('statistics')" class="hover:text-teal-400">Open City Statistics Dashboard</button></li>
+          <li><button onclick="navigateTo('locations')" class="hover:text-teal-400">Interactive GIS Locations Map</button></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-white font-bold text-sm uppercase tracking-wider mb-3">Emergency Contacts</h3>
+        <ul class="space-y-2 text-xs">
+          <li class="flex justify-between"><span>Police Emergency:</span> <strong class="text-red-400">911 / 100</strong></li>
+          <li class="flex justify-between"><span>Fire & Rescue:</span> <strong class="text-red-400">101</strong></li>
+          <li class="flex justify-between"><span>Ambulance & Trauma:</span> <strong class="text-red-400">102</strong></li>
+          <li class="flex justify-between"><span>Disaster Management:</span> <strong class="text-amber-400">108</strong></li>
+          <li class="flex justify-between"><span>Women's Safety:</span> <strong class="text-teal-400">1091</strong></li>
+          <li class="flex justify-between"><span>24/7 Non-Emergency 311:</span> <strong class="text-white">311</strong></li>
+        </ul>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-white font-bold text-sm uppercase tracking-wider">Developer & Accessibility</h3>
+        <p class="text-xs text-slate-400">WCAG 2.1 AA Compliant • High Contrast & Screen-Reader Ready.</p>
+        <button onclick="openDevSpecsModal()" class="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-teal-400 text-xs font-semibold flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-terminal"></i> View Backend API & QA Specs
+        </button>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-800 py-4 px-4 sm:px-6 text-xs text-slate-400">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <p>© 2026 SmartCity Municipal Authority. All rights reserved.</p>
+        <div class="flex flex-wrap gap-4">
+          <button onclick="showToast('WCAG 2.1 Level AA Accessibility Statement verified.', 'info')" class="hover:text-white">Accessibility Statement</button>
+          <button onclick="showToast('SmartCity Citizen Data Privacy Charter v3.1', 'info')" class="hover:text-white">Privacy Policy</button>
+          <button onclick="showToast('SmartCity Open Data & Portal Terms of Use', 'info')" class="hover:text-white">Terms of Use</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================== -->
+  <!-- MODALS & TOAST NOTIFICATIONS               -->
+  <!-- ========================================== -->
+
+  <!-- Emergency Quick Modal -->
+  <div id="emergencyModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border-2 border-red-600 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-extrabold text-red-600 flex items-center gap-2"><i class="fa-solid fa-phone-volume"></i> Emergency One-Tap Dispatch</h3>
+        <button onclick="closeEmergencyModal()" class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-xs text-slate-600 dark:text-slate-400">Tap a service below to connect immediately with SmartCity Emergency Command:</p>
+      <div class="grid grid-cols-2 gap-3">
+        <a href="tel:911" onclick="showToast('Calling Police (911)...', 'error')" class="p-3 rounded-xl bg-red-600 text-white font-bold text-center text-sm">🚓 Police: 911</a>
+        <a href="tel:101" onclick="showToast('Calling Fire Brigade (101)...', 'error')" class="p-3 rounded-xl bg-red-600 text-white font-bold text-center text-sm">🚒 Fire: 101</a>
+        <a href="tel:102" onclick="showToast('Calling Ambulance (102)...', 'error')" class="p-3 rounded-xl bg-emerald-600 text-white font-bold text-center text-sm">🚑 Ambulance: 102</a>
+        <a href="tel:108" onclick="showToast('Calling Disaster Helpline (108)...', 'error')" class="p-3 rounded-xl bg-amber-600 text-white font-bold text-center text-sm">🌊 Disaster: 108</a>
+      </div>
+      <button onclick="closeEmergencyModal(); navigateTo('emergency')" class="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold text-xs">
+        Open Full Emergency & Shelter Guide →
+      </button>
+    </div>
+  </div>
+
+  <!-- Online Service Action Modal (Bills / Tax / Permits) -->
+  <div id="serviceActionModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="serviceModalTitle" class="text-lg font-bold">Online Civic Service</h3>
+        <button onclick="document.getElementById('serviceActionModal').classList.add('hidden')" class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="submitServiceAction(event)" class="space-y-3">
+        <div>
+          <label id="serviceModalInputLabel" class="block text-xs font-semibold mb-1">Reference ID *</label>
+          <input required type="text" placeholder="Enter ID..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">Citizen Email / Mobile *</label>
+          <input required type="text" placeholder="For instant digital receipt" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" />
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm">
+          Proceed & Verify Record
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Developer & QA Specs Drawer Modal (Backend APIs, Leaflet Code & User Persona Scenarios) -->
+  <div id="devSpecsModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-900 text-white">
+        <div>
+          <h3 class="font-bold text-lg">SmartCity Architecture: Backend REST APIs, GIS Map Code & QA Personas</h3>
+          <p class="text-xs text-slate-400">Reference implementation specification for civic engineering & QA testing</p>
+        </div>
+        <button onclick="document.getElementById('devSpecsModal').classList.add('hidden')" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-6 text-xs leading-relaxed">
+        <div>
+          <h4 class="font-bold text-sm text-teal-600 dark:text-teal-400 uppercase mb-2">1. RESTful Backend API Endpoints (Node.js / Express / FastAPI)</h4>
+          <pre class="p-4 rounded-xl bg-slate-950 text-emerald-300 overflow-x-auto font-mono">
+GET    /api/v1/status/live                  -> Live traffic, AQI, weather & power grid telemetry
+GET    /api/v1/transit/arrivals?stopId=S01  -> Real-time GTFS-RT bus, metro, rail & tram arrivals
+POST   /api/v1/transit/plan                 -> Multimodal route calculation (origin, dest, mode)
+GET    /api/v1/hospitals?specialty=&near=   -> Directory with real-time ICU/general bed counts
+POST   /api/v1/hospitals/appointments       -> Book OPD or diagnostic appointment
+GET    /api/v1/education?level=&board=      -> Accredited schools, colleges & library directory
+POST   /api/v1/services/issues              -> Submit 311 civic issue with photo & GPS payload
+GET    /api/v1/services/issues/:ticketId    -> Track service request SLA status (e.g., SC-2026-884)
+POST   /api/v1/emergency/dispatch           -> Priority geo-tagged emergency alert ingestion
+GET    /api/v1/statistics?year=2026&ward=   -> Aggregated open data for Chart.js & CSV/PDF export
+GET    /api/v1/locations?category=&lat=&lng=-> GIS spatial query for categorized city landmarks</pre>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-sm text-teal-600 dark:text-teal-400 uppercase mb-2">2. User Persona Test Scenarios (End-to-End QA)</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <p class="font-bold text-sm">Persona A: Daily Commuter (Elena, 29)</p>
+              <p class="text-slate-600 dark:text-slate-300 mt-1"><strong>Goal:</strong> Check Metro Blue Line delays & EV charger spots.<br/><strong>Flow:</strong> Home → Transportation → Filter "Metro" → Use Route Planner → Verify real-time ETA & Central Plaza EV slots.</p>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <p class="font-bold text-sm">Persona B: Parent in Medical Urgency (Marcus, 41)</p>
+              <p class="text-slate-600 dark:text-slate-300 mt-1"><strong>Goal:</strong> Locate nearest 24/7 pediatric emergency hospital.<br/><strong>Flow:</strong> Quick-Access "Find a Hospital" → Toggle "24/7 Emergency" → Click "Locate Nearest Emergency Hospital" → View distance & available beds.</p>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <p class="font-bold text-sm">Persona C: Resident Reporting Outage (Priya, 35)</p>
+              <p class="text-slate-600 dark:text-slate-300 mt-1"><strong>Goal:</strong> Report broken streetlight & track ticket.<br/><strong>Flow:</strong> Public Services → Submit 311 Issue → Receive generated ID → Paste ID into Tracker → Confirm "IN PROGRESS" status.</p>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <p class="font-bold text-sm">Persona D: Urban Policy Analyst (Dr. Chen, 52)</p>
+              <p class="text-slate-600 dark:text-slate-300 mt-1"><strong>Goal:</strong> Compare 2026 ward AQI & transit ridership.<br/><strong>Flow:</strong> City Statistics → Filter by Ward & Year → Inspect interactive Chart.js canvases → Click "Export CSV" for dataset download.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT DATA & APPLICATION LOGIC        -->
+  <!-- ========================================== -->
+  <script>
+    // --- 1. COMPREHENSIVE REALISTIC DATASET ---
+    const CITY_CENTER = [37.7749, -122.4194];
+
+    const TRANSIT_STOPS = [
+      { id: 'ST-01', name: 'Central Union Station', mode: 'Metro', line: 'Blue Line M1', dest: 'Tech Park North', eta: '2 min', status: 'On Time', accessible: true },
+      { id: 'ST-02', name: 'Civic Center Plaza', mode: 'Bus', line: 'Rapid E-14', dest: 'Harbourfront Ferry', eta: '4 min', status: 'On Time', accessible: true },
+      { id: 'ST-03', name: 'City General Hospital', mode: 'Bus', line: 'MedLink 22', dest: 'Westside Terminal', eta: '6 min', status: 'On Time', accessible: true },
+      { id: 'ST-04', name: 'Harbourfront Terminal', mode: 'Tram', line: 'Coastal Tram T2', dest: 'Marina Pier', eta: '3 min', status: 'Minor Delay (+3m)', accessible: true },
+      { id: 'ST-05', name: 'Tech Park North Hub', mode: 'Metro', line: 'Blue Line M1', dest: 'Airport Terminal 2', eta: '5 min', status: 'On Time', accessible: true },
+      { id: 'ST-06', name: 'Metro University Campus', mode: 'Bus', line: 'Campus Loop 8', dest: 'Central Library', eta: '7 min', status: 'On Time', accessible: true },
+      { id: 'ST-07', name: 'Eastside Rail Junction', mode: 'Rail', line: 'Commuter Express R1', dest: 'Valley Suburbs', eta: '11 min', status: 'On Time', accessible: true },
+      { id: 'ST-08', name: 'Botanical Gardens Gate', mode: 'Tram', line: 'Greenway Tram T1', dest: 'Civic Center Plaza', eta: '9 min', status: 'On Time', accessible: true },
+      { id: 'ST-09', name: 'Airport Terminal 2', mode: 'Rail', line: 'AeroRail Express', dest: 'Central Union Station', eta: '4 min', status: 'On Time', accessible: true },
+      { id: 'ST-10', name: 'Westside Market Square', mode: 'Bus', line: 'Crosstown 45', dest: 'Eastside Rail Junction', eta: '12 min', status: 'Detour via 5th Ave', accessible: true }
+    ];
+
+    const HOSPITALS_DATA = [
+      {
+        id: 'H1', name: 'Metro City General Hospital', specialty: 'Multi-Specialty & Trauma', ward: 'Central District',
+        address: '450 Civic Health Blvd', phone: '(555) 234-8900', emergency: true, beds: 48, icu: 9,
+        opd: 'Mon–Sat: 08:00 AM – 08:00 PM', lat: 37.7792, lng: -122.4150,
+        img: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'H2', name: 'St. Jude Heart & Neuro Institute', specialty: 'Cardiology & Neurology', ward: 'North Tech Corridor',
+        address: '1200 Innovation Way', phone: '(555) 234-7710', emergency: true, beds: 26, icu: 6,
+        opd: 'Mon–Fri: 09:00 AM – 06:00 PM', lat: 37.7865, lng: -122.4082,
+        img: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'H3', name: "Harbourfront Children & Women's Hospital", specialty: 'Pediatrics & Maternity', ward: 'Harbourfront',
+        address: '88 Marina Medical Drive', phone: '(555) 234-6620', emergency: true, beds: 34, icu: 8,
+        opd: 'Daily: 08:00 AM – 09:00 PM', lat: 37.7695, lng: -122.3980,
+        img: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'H4', name: 'Northside Trauma & Orthopedic Center', specialty: 'Multi-Specialty & Trauma', ward: 'North Tech Corridor',
+        address: '910 Northgate Ave', phone: '(555) 234-5511', emergency: true, beds: 19, icu: 4,
+        opd: 'Mon–Sat: 09:00 AM – 05:00 PM', lat: 37.7910, lng: -122.4240,
+        img: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'H5', name: 'Central Blood Bank & Rapid Diagnostics', specialty: 'Blood Bank & Diagnostics', ward: 'Central District',
+        address: '215 Union Square East', phone: '(555) 234-4490', emergency: false, beds: 12, icu: 0,
+        opd: 'Daily: 07:00 AM – 10:00 PM (All Blood Groups O-/AB+ Available)', lat: 37.7755, lng: -122.4110,
+        img: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        id: 'H6', name: 'Westside 24/7 Urgent Care & Pharmacy', specialty: '24/7 Pharmacy & Urgent Care', ward: 'Westside',
+        address: '740 Sunset Market St', phone: '(555) 234-3300', emergency: true, beds: 15, icu: 2,
+        opd: 'Open 24 Hours • Drive-Thru Pharmacy', lat: 37.7680, lng: -122.4360,
+        img: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=800&q=80'
+      }
+    ];
+
+    const EDUCATION_DATA = [
+      {
+        name: 'SmartCity Institute of Technology', level: 'University', board: 'UGC / Accredited', fee: 'Subsidized',
+        location: 'North Tech Corridor', courses: 'AI, Civil Robotics, Clean Energy, Data Science',
+        admission: 'Closes Jan 20, 2027', safeRoute: 'Metro Blue Line M1 • Bike Lane #4',
+        img: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Central Civic High School', level: 'K-12 School', board: 'IB & National', fee: 'Free / Public',
+        location: 'Central District', courses: 'K-12 STEM, Multilingual Arts, Robotics Club',
+        admission: 'Open until Dec 15, 2026', safeRoute: 'School Bus Route S-12 • Crossing Guards',
+        img: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Central Digital Public Library', level: 'Public Library', board: 'Municipal Open Access', fee: 'Free / Public',
+        location: 'Central District', courses: '180K e-Books, 3D Printing Lab, Free Coding Workshops',
+        admission: 'Instant Free SmartCard Membership', safeRoute: 'Civic Center Plaza Bus Hub',
+        img: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Harbourfront Maritime & Engineering College', level: 'Technical College', board: 'STEM State Board', fee: 'Subsidized',
+        location: 'Harbourfront', courses: 'Marine Engineering, Logistics, Renewable Grid Tech',
+        admission: 'Spring Intake: Jan 10, 2027', safeRoute: 'Coastal Tram T2 Stop',
+        img: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Northside STEM Academy', level: 'K-12 School', board: 'STEM State Board', fee: 'Free / Public',
+        location: 'North Tech Corridor', courses: 'Grades 1–12 Computer Science & Environmental Lab',
+        admission: 'Open until Dec 15, 2026', safeRoute: 'Protected Greenway Bike Corridor',
+        img: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Metropolitan University of Arts & Governance', level: 'University', board: 'UGC / Accredited', fee: 'Private / Aid Available',
+        location: 'Central District', courses: 'Public Policy, Urban Design, Economics, Law',
+        admission: 'Closes Feb 05, 2027', safeRoute: 'Metro University Station',
+        img: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Westside Vocational & AI Skill Center', level: 'Technical College', board: 'Municipal Open Access', fee: 'Free / Public',
+        location: 'Westside', courses: 'Cloud Computing, EV Maintenance, Healthcare Nursing',
+        admission: 'Rolling Monthly Cohorts', safeRoute: 'Crosstown Bus 45',
+        img: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80'
+      },
+      {
+        name: 'Riverside Youth Science Library', level: 'Public Library', board: 'Municipal Open Access', fee: 'Free / Public',
+        location: 'Harbourfront', courses: 'Interactive Planetarium, Homework Tutoring, Maker Space',
+        admission: 'Open Daily 8 AM – 9 PM', safeRoute: 'Greenway Tram T1',
+        img: 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80'
+      }
+    ];
+
+    const DEPARTMENTS_DATA = [
+      { name: 'Water & Sanitation Authority', phone: '(555) 311-1001', hours: 'Mon–Sat: 8 AM – 6 PM', head: '24/7 Leak Control' },
+      { name: 'Smart Power & Streetlighting', phone: '(555) 311-1002', hours: '24/7 Grid Operations', head: 'Substation Telemetry' },
+      { name: 'Property Tax & Revenue Desk', phone: '(555) 311-1003', hours: 'Mon–Fri: 9 AM – 5 PM', head: 'City Hall Wing A' },
+      { name: 'Urban Planning & Building Permits', phone: '(555) 311-1004', hours: 'Mon–Fri: 9 AM – 5 PM', head: 'GIS Zoning Counter' },
+      { name: 'Civil Registry (Birth/Marriage)', phone: '(555) 311-1005', hours: 'Mon–Sat: 8:30 AM – 5 PM', head: 'e-Certificate Desk' },
+      { name: 'Solid Waste & Recycling Corp', phone: '(555) 311-1006', hours: 'Daily: 6 AM – 8 PM', head: 'Zero-Waste Division' },
+      { name: 'Public Works & Road Maintenance', phone: '(555) 311-1007', hours: 'Mon–Sat: 7 AM – 7 PM', head: 'Rapid Pothole Unit' },
+      { name: 'Citizen Grievance & 311 Ombudsman', phone: '(555) 311-1008', hours: '24/7 Omnichannel', head: 'SLA Escalation Cell' }
+    ];
+
+    const IMPORTANT_LOCATIONS = [
+      { id: 'L1', name: 'SmartCity Hall & Civic Plaza', category: 'Government', address: '100 Civic Plaza', hours: '8:00 AM – 6:00 PM', phone: '311', accessible: true, lat: 37.7749, lng: -122.4194 },
+      { id: 'L2', name: 'Metro City General Hospital', category: 'Hospital', address: '450 Civic Health Blvd', hours: 'Open 24/7', phone: '(555) 234-8900', accessible: true, lat: 37.7792, lng: -122.4150 },
+      { id: 'L3', name: 'Central Police Headquarters', category: 'Police & Fire', address: '200 Justice Way', hours: 'Open 24/7', phone: '911', accessible: true, lat: 37.7725, lng: -122.4130 },
+      { id: 'L4', name: 'Fire & Rescue Station #01', category: 'Police & Fire', address: '310 Ember Ave', hours: 'Open 24/7', phone: '101', accessible: true, lat: 37.7815, lng: -122.4235 },
+      { id: 'L5', name: 'Central Union Transit Hub', category: 'Transport', address: '1 Union Square', hours: '4:30 AM – 1:30 AM', phone: '(555) 311-2200', accessible: true, lat: 37.7765, lng: -122.4170 },
+      { id: 'L6', name: 'Central Digital Public Library', category: 'School', address: '150 Knowledge St', hours: '7:00 AM – 10:00 PM', phone: '(555) 311-4400', accessible: true, lat: 37.7780, lng: -122.4215 },
+      { id: 'L7', name: 'SmartCity Institute of Technology', category: 'School', address: '1400 Tech Park North', hours: '7:00 AM – 9:00 PM', phone: '(555) 311-5500', accessible: true, lat: 37.7880, lng: -122.4100 },
+      { id: 'L8', name: 'Riverside Botanical Park', category: 'Park & Culture', address: '500 Greenway Blvd', hours: '5:00 AM – 11:00 PM', phone: '(555) 311-6600', accessible: true, lat: 37.7685, lng: -122.4260 },
+      { id: 'L9', name: 'Harbourfront Maritime Museum', category: 'Park & Culture', address: '40 Pier Promenade', hours: '9:00 AM – 7:00 PM', phone: '(555) 311-7700', accessible: true, lat: 37.7710, lng: -122.3960 },
+      { id: 'L10', name: 'Regional Passport & Permit Center', category: 'Government', address: '620 Federal St', hours: '8:30 AM – 5:00 PM', phone: '(555) 311-8800', accessible: true, lat: 37.7830, lng: -122.4180 },
+      { id: 'L11', name: 'Eastside Commuter Rail Terminal', category: 'Transport', address: '900 Rail Yard Rd', hours: '5:00 AM – 12:30 AM', phone: '(555) 311-9900', accessible: true, lat: 37.7740, lng: -122.4020 },
+      { id: 'L12', name: "St. Jude Heart & Neuro Institute", category: 'Hospital', address: '1200 Innovation Way', hours: 'Open 24/7', phone: '(555) 234-7710', accessible: true, lat: 37.7865, lng: -122.4082 }
+    ];
+
+    // Ticket store for 311 tracking
+    const CIVIC_TICKETS = {
+      'SC-2026-884': { type: 'Streetlight Repair', status: 'IN PROGRESS', detail: 'Assigned to Electrical Grid Crew #4 • ETA: Today, 5:30 PM' },
+      'SC-2026-912': { type: 'Pothole Resurfacing', status: 'RESOLVED', detail: 'Completed & verified by Ward 8 Inspector on Nov 23, 2026' }
+    };
+
+    // State variables
+    let homeMapInstance = null;
+    let locationsMapInstance = null;
+    let locationMarkersLayer = null;
+    let currentLocationCat = 'All';
+    let savedLocationIds = JSON.parse(localStorage.getItem('smartcity_favs') || '["L1","L2"]');
+    let userCoords = null;
+    let charts = {};
+
+    // --- 2. NAVIGATION & THEME INITIALIZATION ---
+    function navigateTo(viewName, scrollTargetId = null) {
+      document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('hidden'));
+      const target = document.getElementById('view-' + viewName);
+      if (target) target.classList.remove('hidden');
+
+      // Highlight active nav button
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.nav === viewName) {
+          btn.classList.add('bg-blue-900', 'text-white');
+          btn.classList.remove('text-red-600', 'dark:text-red-400');
+        } else {
+          btn.classList.remove('bg-blue-900', 'text-white');
+          if (btn.dataset.nav === 'emergency') {
+            btn.classList.add('text-red-600', 'dark:text-red-400');
+          }
+        }
+      });
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Fix Leaflet map rendering when switching hidden tabs
+      if (viewName === 'home' && homeMapInstance) {
+        setTimeout(() => homeMapInstance.invalidateSize(), 150);
+      }
+      if (viewName === 'locations') {
+        initLocationsMap();
+        setTimeout(() => locationsMapInstance && locationsMapInstance.invalidateSize(), 150);
+      }
+      if (viewName === 'statistics') {
+        initCharts();
+      }
+
+      if (scrollTargetId) {
+        setTimeout(() => {
+          const el = document.getElementById(scrollTargetId);
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 120);
+      }
+    }
+
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const isDark = html.classList.toggle('dark');
+      localStorage.setItem('smartcity_theme', isDark ? 'dark' : 'light');
+      document.getElementById('darkModeIcon').className = isDark ? 'fa-solid fa-sun text-base' : 'fa-solid fa-moon text-base';
+      if (Object.keys(charts).length) updateChartsData();
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('mobileNavDrawer').classList.toggle('hidden');
+    }
+
+    // --- 3. GLOBAL LIVE SEARCH ---
+    function handleGlobalSearch(query, isMobile = false) {
+      const box = document.getElementById(isMobile ? 'mobileSearchResults' : 'globalSearchResults');
+      const q = query.trim().toLowerCase();
+      if (!q) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      const results = [];
+      HOSPITALS_DATA.forEach(h => {
+        if (h.name.toLowerCase().includes(q) || h.specialty.toLowerCase().includes(q)) {
+          results.push({ title: h.name, sub: 'Hospital • ' + h.specialty, action: () => navigateTo('hospitals') });
+        }
+      });
+      TRANSIT_STOPS.forEach(t => {
+        if (t.name.toLowerCase().includes(q) || t.line.toLowerCase().includes(q)) {
+          results.push({ title: t.name + ' (' + t.line + ')', sub: 'Transit • ETA ' + t.eta, action: () => navigateTo('transportation') });
+        }
+      });
+      EDUCATION_DATA.forEach(e => {
+        if (e.name.toLowerCase().includes(q) || e.courses.toLowerCase().includes(q)) {
+          results.push({ title: e.name, sub: e.level + ' • ' + e.location, action: () => navigateTo('education') });
+        }
+      });
+      IMPORTANT_LOCATIONS.forEach(l => {
+        if (l.name.toLowerCase().includes(q) || l.category.toLowerCase().includes(q)) {
+          results.push({ title: l.name, sub: 'Landmark • ' + l.address, action: () => navigateTo('locations') });
+        }
+      });
+
+      if (!results.length) {
+        box.innerHTML = `<p class="p-3 text-xs text-slate-500">No matching civic services found for "${query}".</p>`;
+      } else {
+        box.innerHTML = results.slice(0, 7).map((r, idx) => `
+          <button onclick="triggerSearchResult(${idx})" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold">${r.title}</p>
+              <p class="text-[11px] text-slate-500">${r.sub}</p>
+            </div>
+            <i class="fa-solid fa-arrow-right text-xs text-teal-600"></i>
+          </button>
+        `).join('');
+        window._latestSearchActions = results.slice(0, 7).map(r => r.action);
+      }
+      box.classList.remove('hidden');
+    }
+
+    function triggerSearchResult(idx) {
+      document.getElementById('globalSearchResults').classList.add('hidden');
+      document.getElementById('mobileSearchResults').classList.add('hidden');
+      if (window._latestSearchActions && window._latestSearchActions[idx]) {
+        window._latestSearchActions[idx]();
+      }
+    }
+
+    // --- 4. TRANSPORTATION LOGIC ---
+    function renderTransitTable(filter = 'All') {
+      const tbody = document.getElementById('transitTableBody');
+      const filtered = filter === 'All' ? TRANSIT_STOPS : TRANSIT_STOPS.filter(s => s.mode === filter);
+      tbody.innerHTML = filtered.map(s => {
+        const isDelayed = s.status !== 'On Time';
+        return `
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <td class="py-3 px-3 font-semibold">${s.name} <span class="text-xs text-slate-400 font-mono">(${s.id})</span></td>
+            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">${s.mode} • ${s.line}</span></td>
+            <td class="py-3 px-3 text-slate-600 dark:text-slate-300">${s.dest}</td>
+            <td class="py-3 px-3 font-bold text-teal-600 dark:text-teal-400">${s.eta}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isDelayed ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}">
+                ${s.status}
+              </span>
+            </td>
+            <td class="py-3 px-3 text-xs text-slate-500"><i class="fa-solid fa-wheelchair text-blue-600 mr-1"></i> Step-Free</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterTransit(mode) {
+      document.querySelectorAll('.transit-filter-btn').forEach(b => {
+        b.classList.remove('bg-blue-900', 'text-white');
+        b.classList.add('bg-slate-100', 'dark:bg-slate-800');
+        if (b.textContent === mode) {
+          b.classList.add('bg-blue-900', 'text-white');
+          b.classList.remove('bg-slate-100', 'dark:bg-slate-800');
+        }
+      });
+      renderTransitTable(mode);
+    }
+
+    function planTransitRoute(e) {
+      e.preventDefault();
+      const orig = document.getElementById('routeOrigin').value;
+      const dest = document.getElementById('routeDest').value;
+      const time = document.getElementById('routeTime').value;
+      const mode = document.getElementById('routeMode').value;
+      const out = document.getElementById('routePlannerOutput');
+      out.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p class="font-bold text-teal-900 dark:text-teal-200">Recommended Itinerary (${time} Departure)</p>
+            <p class="text-xs text-slate-700 dark:text-slate-300 mt-1">
+              <strong>${orig}</strong> → Board <strong>Blue Line M1</strong> → Transfer at Civic Plaza → <strong>${dest}</strong> (${mode})
+            </p>
+          </div>
+          <div class="text-right">
+            <span class="px-3 py-1 rounded-lg bg-teal-600 text-white font-bold text-xs">Est. 24 mins • $1.75</span>
+          </div>
+        </div>
+      `;
+      out.classList.remove('hidden');
+      showToast('Optimal multimodal route calculated!', 'success');
+    }
+
+    function downloadTransitMap() {
+      const csvRows = [
+        ['Stop_ID', 'Stop_Name', 'Mode', 'Line', 'Destination', 'ETA', 'Status', 'Fare_USD'],
+        ...TRANSIT_STOPS.map(s => [s.id, `"${s.name}"`, s.mode, s.line, `"${s.dest}"`, s.eta, s.status, '1.75'])
+      ];
+      triggerCSVDownload(csvRows, 'SmartCity_Transit_Schedule_2026.csv');
+      showToast('Transit schedule & fare table downloaded!', 'success');
+    }
+
+    // --- 5. HOSPITALS & HEALTHCARE LOGIC ---
+    function renderHospitals() {
+      const q = document.getElementById('hospSearch').value.toLowerCase();
+      const spec = document.getElementById('hospSpecialtyFilter').value;
+      const ward = document.getElementById('hospWardFilter').value;
+      const emergOnly = document.getElementById('hospEmergencyOnly').checked;
+
+      const filtered = HOSPITALS_DATA.filter(h => {
+        const matchQ = h.name.toLowerCase().includes(q) || h.specialty.toLowerCase().includes(q) || h.address.toLowerCase().includes(q);
+        const matchSpec = spec === 'All' || h.specialty === spec;
+        const matchWard = ward === 'All' || h.ward === ward;
+        const matchEmerg = !emergOnly || h.emergency;
+        return matchQ && matchSpec && matchWard && matchEmerg;
+      });
+
+      const grid = document.getElementById('hospitalsGrid');
+      grid.innerHTML = filtered.map(h => `
+        <article class="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="relative h-44 bg-slate-200 dark:bg-slate-800">
+              <img src="${h.img}" onerror="this.src='https://placehold.co/600x350/0f172a/ffffff?text=SmartCity+Hospital'" alt="${h.name}" class="w-full h-full object-cover" />
+              <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold ${h.emergency ? 'bg-red-600 text-white' : 'bg-slate-900/80 text-white'}">
+                ${h.emergency ? '24/7 Emergency Active' : 'Outpatient & Diagnostics'}
+              </span>
+            </div>
+            <div class="p-5 space-y-2.5">
+              <span class="text-xs font-semibold text-teal-600 dark:text-teal-400">${h.specialty}</span>
+              <h3 class="font-bold text-lg leading-snug">${h.name}</h3>
+              <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i>${h.address} (${h.ward})</p>
+              <p class="text-xs text-slate-500"><i class="fa-solid fa-clock mr-1 text-slate-400"></i>${h.opd}</p>
+              <div class="grid grid-cols-2 gap-2 pt-2">
+                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-center">
+                  <p class="text-[11px] text-slate-500">Available Beds</p>
+                  <p class="font-extrabold text-emerald-600 text-base">${h.beds}</p>
+                </div>
+                <div class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-center">
+                  <p class="text-[11px] text-slate-500">ICU Beds Free</p>
+                  <p class="font-extrabold text-blue-700 dark:text-blue-400 text-base">${h.icu}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="px-5 pb-5 pt-2 flex gap-2">
+            <a href="tel:${h.phone}" class="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-center text-xs font-semibold">
+              <i class="fa-solid fa-phone mr-1"></i> ${h.phone}
+            </a>
+            <button onclick="selectHospitalForAppt('${h.name.replace(/'/g, "\\'")}')" class="flex-1 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold">
+              Book OPD
+            </button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function selectHospitalForAppt(name) {
+      const sel = document.getElementById('apptHospital');
+      sel.value = name;
+      document.getElementById('appointmentFormCard').scrollIntoView({ behavior: 'smooth' });
+      showToast('Selected ' + name + ' for OPD booking', 'info');
+    }
+
+    function submitHospitalAppointment(e) {
+      e.preventDefault();
+      const name = document.getElementById('apptName').value;
+      const hosp = document.getElementById('apptHospital').value;
+      const date = document.getElementById('apptDate').value;
+      showToast(`OPD Appointment confirmed for ${name} at ${hosp} on ${date}.`, 'success');
+      e.target.reset();
+    }
+
+    function findNearestHospital() {
+      navigateTo('hospitals');
+      const banner = document.getElementById('nearestHospitalBanner');
+      banner.classList.remove('hidden');
+      banner.innerHTML = `<p class="text-sm font-semibold text-red-800 dark:text-red-200"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Acquiring GPS coordinates to locate closest emergency trauma center...</p>`;
+
+      const displayNearest = (lat, lng, sourceLabel) => {
+        let nearest = HOSPITALS_DATA[0];
+        let minDist = Infinity;
+        HOSPITALS_DATA.filter(h => h.emergency).forEach(h => {
+          const d = haversineKm(lat, lng, h.lat, h.lng);
+          if (d < minDist) { minDist = d; nearest = h; }
+        });
+        banner.innerHTML = `
+          <div>
+            <span class="text-xs font-bold uppercase text-red-600">Nearest 24/7 Emergency Center (${sourceLabel})</span>
+            <h3 class="font-extrabold text-lg text-slate-900 dark:text-white">${nearest.name} — ${minDist.toFixed(1)} km away</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-300">${nearest.address} • <strong>${nearest.beds} General Beds</strong> & <strong>${nearest.icu} ICU Beds</strong> ready</p>
+          </div>
+          <div class="flex gap-2">
+            <a href="tel:${nearest.phone}" class="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold">Call ER: ${nearest.phone}</a>
+            <button onclick="navigateTo('locations')" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">Open Map Route</button>
+          </div>
+        `;
+      };
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => displayNearest(pos.coords.latitude, pos.coords.longitude, 'Live GPS'),
+          () => displayNearest(CITY_CENTER[0], CITY_CENTER[1], 'City Center Default')
+        );
+      } else {
+        displayNearest(CITY_CENTER[0], CITY_CENTER[1], 'City Center Default');
+      }
+    }
+
+    // --- 6. EDUCATION LOGIC ---
+    function renderEducation() {
+      const q = document.getElementById('eduSearch').value.toLowerCase();
+      const lvl = document.getElementById('eduLevelFilter').value;
+      const brd = document.getElementById('eduBoardFilter').value;
+      const fee = document.getElementById('eduFeeFilter').value;
+
+      const filtered = EDUCATION_DATA.filter(e => {
+        return (e.name.toLowerCase().includes(q) || e.courses.toLowerCase().includes(q)) &&
+               (lvl === 'All' || e.level === lvl) &&
+               (brd === 'All' || e.board === brd) &&
+               (fee === 'All' || e.fee === fee);
+      });
+
+      document.getElementById('educationGrid').innerHTML = filtered.map(e => `
+        <article class="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <img src="${e.img}" onerror="this.src='https://placehold.co/600x350/1e3a8a/ffffff?text=SmartCity+Campus'" alt="${e.name}" class="w-full h-36 object-cover" />
+            <div class="p-4 space-y-2">
+              <div class="flex items-center justify-between text-[11px] font-bold">
+                <span class="text-emerald-600 dark:text-emerald-400 uppercase">${e.level}</span>
+                <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">${e.fee}</span>
+              </div>
+              <h3 class="font-bold text-base leading-snug">${e.name}</h3>
+              <p class="text-xs text-slate-500"><i class="fa-solid fa-award mr-1"></i>${e.board} • ${e.location}</p>
+              <p class="text-xs text-slate-600 dark:text-slate-300"><strong>Programs:</strong> ${e.courses}</p>
+              <p class="text-[11px] text-teal-600 dark:text-teal-400 font-medium"><i class="fa-solid fa-shield-heart mr-1"></i>${e.safeRoute}</p>
+            </div>
+          </div>
+          <div class="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-500">${e.admission}</span>
+            <button onclick="showToast('Admission brochure downloaded for ${e.name.replace(/'/g, "\\'")}', 'success')" class="font-bold text-blue-700 dark:text-blue-400 hover:underline">Apply →</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    // --- 7. PUBLIC SERVICES & 311 TICKETS ---
+    function renderDepartments() {
+      document.getElementById('departmentsGrid').innerHTML = DEPARTMENTS_DATA.map(d => `
+        <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+          <span class="text-[11px] font-bold text-teal-600 dark:text-teal-400 uppercase">${d.head}</span>
+          <h3 class="font-bold text-sm">${d.name}</h3>
+          <p class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i>${d.hours}</p>
+          <a href="tel:${d.phone}" class="inline-block text-xs font-bold text-blue-700 dark:text-blue-400 pt-1"><i class="fa-solid fa-phone mr-1"></i>${d.phone}</a>
+        </div>
+      `).join('');
+    }
+
+    function openServiceActionModal(title, inputLabel) {
+      document.getElementById('serviceModalTitle').textContent = title;
+      document.getElementById('serviceModalInputLabel').textContent = inputLabel;
+      document.getElementById('serviceActionModal').classList.remove('hidden');
+    }
+
+    function submitServiceAction(e) {
+      e.preventDefault();
+      document.getElementById('serviceActionModal').classList.add('hidden');
+      showToast('Citizen service request processed! Digital receipt sent to your email.', 'success');
+    }
+
+    function submitCivicIssue(e) {
+      e.preventDefault();
+      const cat = document.getElementById('issueCategory').value;
+      const loc = document.getElementById('issueLocation').value;
+      const newId = 'SC-2026-' + Math.floor(100 + Math.random() * 899);
+      CIVIC_TICKETS[newId] = {
+        type: cat,
+        status: 'DISPATCHED',
+        detail: `Logged at ${loc} • Field inspector assigned (SLA: 12 hrs)`
+      };
+      document.getElementById('trackTicketInput').value = newId;
+      trackCivicTicket();
+      showToast(`Civic issue logged! Tracking ID: ${newId}`, 'success');
+      e.target.reset();
+    }
+
+    function trackCivicTicket() {
+      const id = document.getElementById('trackTicketInput').value.trim().toUpperCase();
+      const box = document.getElementById('ticketStatusResult');
+      const ticket = CIVIC_TICKETS[id];
+      if (ticket) {
+        box.innerHTML = `
+          <div class="flex justify-between font-bold">
+            <span>ID: ${id} (${ticket.type})</span>
+            <span class="text-emerald-600">${ticket.status}</span>
+          </div>
+          <p class="text-slate-600 dark:text-slate-300 mt-1">${ticket.detail}</p>
+        `;
+      } else {
+        box.innerHTML = `<p class="text-red-600 font-semibold">No ticket found for "${id}". Try SC-2026-884 or SC-2026-912.</p>`;
+      }
+    }
+
+    // --- 8. EMERGENCY HELPERS ---
+    function openEmergencyModal() { document.getElementById('emergencyModal').classList.remove('hidden'); }
+    function closeEmergencyModal() { document.getElementById('emergencyModal').classList.add('hidden'); }
+    function openDevSpecsModal() { document.getElementById('devSpecsModal').classList.remove('hidden'); }
+
+    function fillCurrentGPS() {
+      const inp = document.getElementById('emergLocInput');
+      inp.value = '37.7749° N, 122.4194° W (Verified Civic GPS)';
+      showToast('GPS coordinates attached to emergency report.', 'info');
+    }
+
+    function submitEmergencyReport(e) {
+      e.preventDefault();
+      showToast('PRIORITY ALERT TRANSMITTED! Nearest response unit dispatched.', 'error');
+      e.target.reset();
+    }
+
+    function submitContactForm(e) {
+      e.preventDefault();
+      showToast('Thank you! Your message has been routed to SmartCity Citizen Relations.', 'success');
+      e.target.reset();
+    }
+
+    // --- 9. INTERACTIVE MAPS (LEAFLET.JS) ---
+    function createMarkerIcon(category) {
+      let color = '#1e3a8a';
+      let iconClass = 'fa-building-columns';
+      if (category === 'Hospital') { color = '#dc2626'; iconClass = 'fa-hospital'; }
+      else if (category === 'School') { color = '#059669'; iconClass = 'fa-graduation-cap'; }
+      else if (category === 'Transport') { color = '#0284c7'; iconClass = 'fa-train-subway'; }
+      else if (category === 'Police & Fire') { color = '#4f46e5'; iconClass = 'fa-shield-halved'; }
+      else if (category === 'Park & Culture') { color = '#0d9488'; iconClass = 'fa-tree'; }
+
+      return L.divIcon({
+        className: '',
+        html: `<div class="custom-pin" style="background:${color}"><i class="fa-solid ${iconClass}"></i></div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+    }
+
+    function initHomeMap() {
+      if (homeMapInstance) return;
+      homeMapInstance = L.map('homeMap').setView(CITY_CENTER, 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap & CARTO'
+      }).addTo(homeMapInstance);
+
+      IMPORTANT_LOCATIONS.slice(0, 8).forEach(loc => {
+        L.marker([loc.lat, loc.lng], { icon: createMarkerIcon(loc.category) })
+          .addTo(homeMapInstance)
+          .bindPopup(`<strong>${loc.name}</strong><br/><span style="font-size:12px">${loc.category} • ${loc.address}</span>`);
+      });
+    }
+
+    function initLocationsMap() {
+      if (!locationsMapInstance) {
+        locationsMapInstance = L.map('locationsFullMap').setView(CITY_CENTER, 13);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OpenStreetMap & CARTO'
+        }).addTo(locationsMapInstance);
+        locationMarkersLayer = L.layerGroup().addTo(locationsMapInstance);
+      }
+      renderImportantLocations();
+    }
+
+    function setLocationCategory(cat) {
+      currentLocationCat = cat;
+      document.querySelectorAll('.loc-cat-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-900', 'text-white');
+        btn.classList.add('bg-slate-100', 'dark:bg-slate-800');
+        if ((cat === 'All' && btn.textContent.includes('All')) || btn.textContent.includes(cat.split(' ')[0])) {
+          btn.classList.add('bg-blue-900', 'text-white');
+          btn.classList.remove('bg-slate-100', 'dark:bg-slate-800');
+        }
+      });
+      renderImportantLocations();
+    }
+
+    function renderImportantLocations() {
+      const q = document.getElementById('locationSearchInput').value.toLowerCase();
+      let list = IMPORTANT_LOCATIONS.filter(l => {
+        const matchCat = currentLocationCat === 'All' || l.category === currentLocationCat;
+        const matchQ = l.name.toLowerCase().includes(q) || l.address.toLowerCase().includes(q);
+        return matchCat && matchQ;
+      });
+
+      const refLat = userCoords ? userCoords.lat : CITY_CENTER[0];
+      const refLng = userCoords ? userCoords.lng : CITY_CENTER[1];
+      list = list.map(l => ({ ...l, distKm: haversineKm(refLat, refLng, l.lat, l.lng) }));
+      if (userCoords) list.sort((a, b) => a.distKm - b.distKm);
+
+      if (locationMarkersLayer) {
+        locationMarkersLayer.clearLayers();
+        list.forEach(l => {
+          L.marker([l.lat, l.lng], { icon: createMarkerIcon(l.category) })
+            .addTo(locationMarkersLayer)
+            .bindPopup(`<strong>${l.name}</strong><br/>${l.address}<br/>Hours: ${l.hours}`);
+        });
+      }
+
+      document.getElementById('locationsCardsList').innerHTML = list.map(l => {
+        const isFav = savedLocationIds.includes(l.id);
+        return `
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="text-[11px] font-bold uppercase text-teal-600 dark:text-teal-400">${l.category} • ${l.distKm.toFixed(1)} km</span>
+                <h3 class="font-bold text-base">${l.name}</h3>
+              </div>
+              <button onclick="toggleFavoriteLocation('${l.id}')" aria-label="Save Location" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-amber-500">
+                <i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+              </button>
+            </div>
+            <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot mr-1"></i>${l.address} • <i class="fa-regular fa-clock ml-1 mr-1"></i>${l.hours}</p>
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold">♿ Wheelchair Accessible</span>
+              <div class="flex gap-1.5">
+                <button onclick="focusMapPin(${l.lat}, ${l.lng}, '${l.name.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-blue-900 text-white text-xs font-semibold">Zoom Map</button>
+                <button onclick="copyLocationLink('${l.name.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold">Share</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function focusMapPin(lat, lng, name) {
+      if (locationsMapInstance) {
+        locationsMapInstance.setView([lat, lng], 15);
+        showToast('Centered map on ' + name, 'info');
+      }
+    }
+
+    function toggleFavoriteLocation(id) {
+      if (savedLocationIds.includes(id)) {
+        savedLocationIds = savedLocationIds.filter(x => x !== id);
+        showToast('Removed from saved locations', 'info');
+      } else {
+        savedLocationIds.push(id);
+        showToast('Location bookmarked to your Civic Favorites!', 'success');
+      }
+      localStorage.setItem('smartcity_favs', JSON.stringify(savedLocationIds));
+      renderImportantLocations();
+    }
+
+    function copyLocationLink(name) {
+      const dummyInput = document.createElement('input');
+      dummyInput.value = `https://smartcity.gov/map?place=${encodeURIComponent(name)}`;
+      document.body.appendChild(dummyInput);
+      dummyInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummyInput);
+      showToast('Shareable GIS map link copied for ' + name, 'success');
+    }
+
+    function sortLocationsNearMe() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            userCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            renderImportantLocations();
+            showToast('Locations sorted by distance from your live GPS!', 'success');
+          },
+          () => {
+            userCoords = { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
+            renderImportantLocations();
+            showToast('Sorted by distance from Central Civic Plaza.', 'info');
+          }
+        );
+      }
+    }
+
+    // --- 10. CITY STATISTICS CHARTS (CHART.JS) ---
+    function initCharts() {
+      if (charts.transit) return;
+      const isDark = document.documentElement.classList.contains('dark');
+      const gridColor = isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(15, 23, 42, 0.08)';
+      const textColor = isDark ? '#cbd5e1' : '#475569';
+
+      charts.transit = new Chart(document.getElementById('transitChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+          datasets: [
+            { label: 'Metro & Rail', data: [410, 425, 440, 465, 490, 520], backgroundColor: '#1e3a8a', borderRadius: 6 },
+            { label: 'Electric Bus', data: [290, 305, 315, 330, 345, 360], backgroundColor: '#0d9488', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: textColor, font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor } }
+          }
+        }
+      });
+
+      charts.aqi = new Chart(document.getElementById('aqiChart'), {
+        type: 'line',
+        data: {
+          labels: ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+          datasets: [{
+            label: 'Citywide Avg AQI',
+            data: [46, 44, 42, 40, 39, 38],
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            fill: true, tension: 0.35
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: textColor, font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor }, min: 20, max: 65 }
+          }
+        }
+      });
+
+      charts.sector = new Chart(document.getElementById('sectorChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Healthcare', 'Education', 'Smart Transit', 'Clean Energy & Parks'],
+          datasets: [{
+            data: [32, 28, 24, 16],
+            backgroundColor: ['#0d9488', '#1e3a8a', '#0284c7', '#10b981'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { size: 11 } } } }
+        }
+      });
+    }
+
+    function updateChartsData() {
+      const yr = document.getElementById('statsYearFilter').value;
+      const ward = document.getElementById('statsWardFilter').value;
+      const mult = yr === '2026' ? 1 : yr === '2025' ? 0.91 : 0.84;
+      const wardFactor = ward === 'All' ? 1 : ward === 'North' ? 0.42 : 0.31;
+
+      if (charts.transit) {
+        charts.transit.data.datasets[0].data = [410, 425, 440, 465, 490, 520].map(v => Math.round(v * mult * wardFactor));
+        charts.transit.data.datasets[1].data = [290, 305, 315, 330, 345, 360].map(v => Math.round(v * mult * wardFactor));
+        charts.transit.update();
+      }
+      if (charts.aqi) {
+        const offset = yr === '2026' ? 0 : yr === '2025' ? 5 : 9;
+        charts.aqi.data.datasets[0].data = [46, 44, 42, 40, 39, 38].map(v => v + offset);
+        charts.aqi.update();
+      }
+      showToast(`Dashboard telemetry updated for ${yr} (${ward})`, 'info');
+    }
+
+    function exportStatsCSV() {
+      const rows = [
+        ['Metric', 'Value_2026', 'Unit', 'Ward_Scope'],
+        ['Population', '1420500', 'Residents', 'All 42 Wards'],
+        ['Municipal_Area', '485', 'sq_km', 'All 42 Wards'],
+        ['Literacy_Rate', '94.8', 'Percent', 'All 42 Wards'],
+        ['Average_AQI', '38', 'AQI_Index', 'All 42 Wards'],
+        ['311_SLA_Resolution', '96.2', 'Percent', 'All 42 Wards']
+      ];
+      triggerCSVDownload(rows, 'SmartCity_OpenData_Report_2026.csv');
+      showToast('Open Data CSV report exported!', 'success');
+    }
+
+    // --- 11. UTILITY HELPERS ---
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function triggerCSVDownload(rows, filename) {
+      const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const colors = {
+        success: 'bg-emerald-600 text-white',
+        error: 'bg-red-600 text-white',
+        info: 'bg-slate-900 dark:bg-slate-800 text-white border border-slate-700'
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center justify-between gap-3 transition transform translate-y-0 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark"></i></button>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+
+    // --- 12. BOOTSTRAP ON WINDOW LOAD ---
+    window.onload = function () {
+      // Restore saved theme
+      if (localStorage.getItem('smartcity_theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.getElementById('darkModeIcon').className = 'fa-solid fa-sun text-base';
+      }
+
+      // Render dynamic directories
+      renderTransitTable();
+      renderHospitals();
+      renderEducation();
+      renderDepartments();
+
+      // Initialize Home view & Leaflet map
+      navigateTo('home');
+      initHomeMap();
+    };
+  </script>
+</body>
+</html>
